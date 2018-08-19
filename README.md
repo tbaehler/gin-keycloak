@@ -49,17 +49,16 @@ First, define your access triples to identify who has access to a
 given resource. This snippet shows how to grant resource access to two
 hypothetical employees:
 
-        // from ginkeycloak package
-        // AccessTuple is the type defined for use in AccessTuples.
+    //from ginkeycloak package
+    // AccessTuple is the type defined for use in AccessTuples.
+      
             type AccessTuple struct {
            	    Service string
            	    Role    string
            	    Uid     string
             }
         
-        // var GRANTED_USERS  = []ginkeycloak.AccessTuple{
-	    //  {Uid: "domain\user1"},
-        //}
+    var GRANTED_USERS  = []ginkeycloak.AccessTuple{{Uid: "domain\user1"}}
 
 
 Next, define which Gin middlewares you use. The third line in this
