@@ -3,20 +3,20 @@
 package ginkeycloak
 
 import (
-	"encoding/json"
+	"crypto/rsa"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"github.com/gin-gonic/gin"
+	"github.com/golang/glog"
+	"github.com/patrickmn/go-cache"
+	"golang.org/x/oauth2"
+	"gopkg.in/square/go-jose.v2/jwt"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
-	"github.com/gin-gonic/gin"
-	"github.com/golang/glog"
-	"golang.org/x/oauth2"
-	"gopkg.in/square/go-jose.v2/jwt"
-	"math/big"
-	"crypto/rsa"
-	"github.com/patrickmn/go-cache"
 )
 
 // VarianceTimer controls the max runtime of Auth() and AuthChain() middleware
@@ -24,10 +24,9 @@ var VarianceTimer time.Duration = 30000 * time.Millisecond
 var Transport = http.Transport{}
 var publicKeyCache = cache.New(8*time.Hour, 8*time.Hour)
 
-
 // TokenContainer stores all relevant token information
 type TokenContainer struct {
-	Token    *oauth2.Token
+	Token         *oauth2.Token
 	KeyCloakToken *KeyCloakToken
 }
 
@@ -36,27 +35,27 @@ type TokenContainer struct {
 type AccessCheckFunction func(tc *TokenContainer, ctx *gin.Context) bool
 
 type KeyCloakToken struct {
-	Jti            string   `json:"jti"`
-	Exp            int      `json:"exp"`
-	Nbf            int      `json:"nbf"`
-	Iat            int      `json:"iat"`
-	Iss            string   `json:"iss"`
-	Aud            string   `json:"aud"`
-	Sub            string   `json:"sub"`
-	Typ            string   `json:"typ"`
-	Azp            string   `json:"azp"`
-	Nonce          string   `json:"nonce"`
-	AuthTime       int      `json:"auth_time"`
-	SessionState   string   `json:"session_state"`
-	Acr            string   `json:"acr"`
-	ClientSession  string   `json:"client_session"`
-	AllowedOrigins []string `json:"allowed-origins"`
-	ResourceAccess  map[string]ServiceRole `json:"resource_access"`
-	Name              string `json:"name"`
-	PreferredUsername string `json:"preferred_username"`
-	GivenName         string `json:"given_name"`
-	FamilyName        string `json:"family_name"`
-	Email             string `json:"email"`
+	Jti               string                 `json:"jti"`
+	Exp               int64                  `json:"exp"`
+	Nbf               int64                  `json:"nbf"`
+	Iat               int64                  `json:"iat"`
+	Iss               string                 `json:"iss"`
+	Aud               string                 `json:"aud"`
+	Sub               string                 `json:"sub"`
+	Typ               string                 `json:"typ"`
+	Azp               string                 `json:"azp"`
+	Nonce             string                 `json:"nonce"`
+	AuthTime          int64                  `json:"auth_time"`
+	SessionState      string                 `json:"session_state"`
+	Acr               string                 `json:"acr"`
+	ClientSession     string                 `json:"client_session"`
+	AllowedOrigins    []string               `json:"allowed-origins"`
+	ResourceAccess    map[string]ServiceRole `json:"resource_access"`
+	Name              string                 `json:"name"`
+	PreferredUsername string                 `json:"preferred_username"`
+	GivenName         string                 `json:"given_name"`
+	FamilyName        string                 `json:"family_name"`
+	Email             string                 `json:"email"`
 }
 
 type ServiceRole struct {
@@ -79,7 +78,7 @@ func extractToken(r *http.Request) (*oauth2.Token, error) {
 
 func GetTokenContainer(token *oauth2.Token, config KeycloakConfig) (*TokenContainer, error) {
 
-	keyCloakToken, err := decodeToken(token, config);
+	keyCloakToken, err := decodeToken(token, config)
 	if err != nil {
 		return nil, err
 	}
@@ -93,10 +92,9 @@ func GetTokenContainer(token *oauth2.Token, config KeycloakConfig) (*TokenContai
 	}, nil
 }
 
-
 func getPublicKey(keyId string, config KeycloakConfig) (string, string, error) {
 	keyEntry, exists := publicKeyCache.Get(keyId)
-	if (!exists) {
+	if !exists {
 		url := config.Url + "/auth/realms/" + config.Realm + "/protocol/openid-connect/certs"
 
 		resp, err := http.Get(url)
@@ -155,6 +153,15 @@ func decodeToken(token *oauth2.Token, config KeycloakConfig) (*KeyCloakToken, er
 	return &keyCloakToken, nil
 }
 
+func isExpired(token *KeyCloakToken) bool {
+	if token.Exp == 0 {
+		return false
+	}
+	now := time.Now()
+	fromUnixTimestamp := time.Unix(token.Exp, 0)
+	return now.After(fromUnixTimestamp)
+}
+
 func getTokenContainer(ctx *gin.Context, config KeycloakConfig) (*TokenContainer, bool) {
 	var oauthToken *oauth2.Token
 	var tc *TokenContainer
@@ -174,6 +181,11 @@ func getTokenContainer(ctx *gin.Context, config KeycloakConfig) (*TokenContainer
 		return nil, false
 	}
 
+	if isExpired(tc.KeyCloakToken) {
+		glog.Errorf("[Gin-OAuth] Keycloak Token has expired")
+		return nil, false
+	}
+
 	return tc, true
 }
 
@@ -185,7 +197,7 @@ func (t *TokenContainer) Valid() bool {
 }
 
 type KeycloakConfig struct {
-	Url string
+	Url   string
 	Realm string
 }
 
@@ -263,4 +275,3 @@ func RequestLogger(keys []string, contentKey string) gin.HandlerFunc {
 		}
 	}
 }
-
