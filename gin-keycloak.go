@@ -40,7 +40,7 @@ type KeyCloakToken struct {
 	Nbf               int64                  `json:"nbf"`
 	Iat               int64                  `json:"iat"`
 	Iss               string                 `json:"iss"`
-	Aud               string                 `json:"aud"`
+	Aud               []string               `json:"aud"`
 	Sub               string                 `json:"sub"`
 	Typ               string                 `json:"typ"`
 	Azp               string                 `json:"azp"`
