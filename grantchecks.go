@@ -23,8 +23,8 @@ func GroupCheck(at []AccessTuple) func(tc *TokenContainer, ctx *gin.Context) boo
 			if tc.KeyCloakToken.ResourceAccess != nil {
 				serviceRoles := tc.KeyCloakToken.ResourceAccess[at.Service]
 				for _, role := range serviceRoles.Roles {
-					if (role == at.Role) {
-						return true;
+					if role == at.Role {
+						return true
 					}
 				}
 			}
@@ -46,5 +46,13 @@ func UidCheck(at []AccessTuple) func(tc *TokenContainer, ctx *gin.Context) bool 
 			}
 		}
 		return false
+	}
+}
+
+func AuthCheck(at []AccessTuple) func(tc *TokenContainer, ctx *gin.Context) bool {
+	return func(tc *TokenContainer, ctx *gin.Context) bool {
+		ctx.Set("token", *tc.KeyCloakToken)
+		ctx.Set("uid", tc.KeyCloakToken.PreferredUsername)
+		return true
 	}
 }

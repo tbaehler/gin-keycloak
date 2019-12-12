@@ -58,6 +58,20 @@ type KeyCloakToken struct {
 	Email             string                 `json:"email"`
 }
 
+type Certs struct {
+	Keys []struct {
+		Kid     string   `json:"kid"`
+		Kty     string   `json:"kty"`
+		Alg     string   `json:"alg"`
+		Use     string   `json:"use"`
+		N       string   `json:"n"`
+		E       string   `json:"e"`
+		X5C     []string `json:"x5c"`
+		X5T     string   `json:"x5t"`
+		X5TS256 string   `json:"x5t#S256"`
+	} `json:"keys"`
+}
+
 type ServiceRole struct {
 	Roles []string `json:"roles"`
 }
@@ -104,18 +118,19 @@ func getPublicKey(keyId string, config KeycloakConfig) (string, string, error) {
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 
-		var data map[string][]map[string]string
-		err = json.Unmarshal(body, &data)
+		var certs Certs
+		err = json.Unmarshal(body, &certs)
 		if err != nil {
 			return "", "", err
 		}
-		keyEntry = data["keys"]
+
+		keyEntry = certs
 		publicKeyCache.Set(keyId, keyEntry, cache.DefaultExpiration)
 	}
 
-	for _, keyIdFromServer := range keyEntry.([]map[string]string) {
-		if keyIdFromServer["kid"] == keyId {
-			return keyIdFromServer["n"], keyIdFromServer["e"], nil
+	for _, keyIdFromServer := range keyEntry.(Certs).Keys {
+		if keyIdFromServer.Kid == keyId {
+			return keyIdFromServer.N, keyIdFromServer.E, nil
 		}
 
 	}

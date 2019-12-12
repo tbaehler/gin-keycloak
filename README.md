@@ -43,6 +43,39 @@ Assuming you've installed Go and Gin, run this:
 
 ## Usage
 
+### Authentication-Based Access
+
+With this function you just check if user is authenticated. Therefore there is no need for AccessTuple unlike next two access types.
+
+Gin middlewares you use:
+
+	router := gin.New()
+	router.Use(ginglog.Logger(3 * time.Second))
+	router.Use(ginkeycloak.RequestLogger([]string{"uid"}, "data"))
+	router.Use(gin.Recovery())
+
+A Keycloakconfig
+
+    var sbbEndpoint = ginkeycloak.KeycloakConfig{
+	    Url:  "https://keycloack.domain.ch/",
+	    Realm: "Your Realm",
+    }
+
+Lastly, define which type of access you grant to the defined
+team. We'll use a router group again:
+
+
+	privateGroup := router.Group("/api/privateGroup")
+	privateGroup.Use(ginkeycloak.Auth(ginkeycloak.GroupCheck(GRANTED_ROLE), keycloakconfig))
+	privateGroup.GET("/", func(c *gin.Context) {
+		....
+	})
+
+Once again, you can use curl to test:
+
+        curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/privateGroup/
+        {"message":"Hello from private to sszuecs member of teapot"}
+
 ### Uid-Based Access
 
 First, define your access triples to identify who has access to a
@@ -127,6 +160,7 @@ Once again, you can use curl to test:
 
         curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/privateGroup/
         {"message":"Hello from private to sszuecs member of teapot"}
+
 
 ## Contributors
 
