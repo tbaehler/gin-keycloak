@@ -6,7 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AccessTuple is the type defined for use in AccessTuples.
+type AccessCheckFunction func(tc *TokenContainer, ctx *gin.Context) bool
+
 type AccessTuple struct {
 	Service string
 	Role    string

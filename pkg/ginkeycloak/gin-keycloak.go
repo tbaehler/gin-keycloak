@@ -1,5 +1,3 @@
-// Package gin-keycloak implements an Keycloak based authorization
-// middleware for the Gin https://github.com/gin-gonic/gin
 package ginkeycloak
 
 import (
@@ -28,48 +26,6 @@ var publicKeyCache = cache.New(8*time.Hour, 8*time.Hour)
 type TokenContainer struct {
 	Token         *oauth2.Token
 	KeyCloakToken *KeyCloakToken
-}
-
-// AccessCheckFunction is a function that checks if a given token grants
-// access.
-type AccessCheckFunction func(tc *TokenContainer, ctx *gin.Context) bool
-
-type KeyCloakToken struct {
-	Jti string `json:"jti"`
-	Exp int64  `json:"exp"`
-	Nbf int64  `json:"nbf"`
-	Iat int64  `json:"iat"`
-	Iss string `json:"iss"`
-	//Aud               []string               `json:"aud"`
-	Sub               string                 `json:"sub"`
-	Typ               string                 `json:"typ"`
-	Azp               string                 `json:"azp"`
-	Nonce             string                 `json:"nonce"`
-	AuthTime          int64                  `json:"auth_time"`
-	SessionState      string                 `json:"session_state"`
-	Acr               string                 `json:"acr"`
-	ClientSession     string                 `json:"client_session"`
-	AllowedOrigins    []string               `json:"allowed-origins"`
-	ResourceAccess    map[string]ServiceRole `json:"resource_access"`
-	Name              string                 `json:"name"`
-	PreferredUsername string                 `json:"preferred_username"`
-	GivenName         string                 `json:"given_name"`
-	FamilyName        string                 `json:"family_name"`
-	Email             string                 `json:"email"`
-}
-
-type Certs struct {
-	Keys []struct {
-		Kid     string   `json:"kid"`
-		Kty     string   `json:"kty"`
-		Alg     string   `json:"alg"`
-		Use     string   `json:"use"`
-		N       string   `json:"n"`
-		E       string   `json:"e"`
-		X5C     []string `json:"x5c"`
-		X5T     string   `json:"x5t"`
-		X5TS256 string   `json:"x5t#S256"`
-	} `json:"keys"`
 }
 
 type ServiceRole struct {
@@ -132,7 +88,6 @@ func getPublicKey(keyId string, config KeycloakConfig) (string, string, error) {
 		if keyIdFromServer.Kid == keyId {
 			return keyIdFromServer.N, keyIdFromServer.E, nil
 		}
-
 	}
 
 	return "", "", errors.New("no key found")
@@ -217,10 +172,10 @@ type KeycloakConfig struct {
 }
 
 func Auth(accessCheckFunction AccessCheckFunction, endpoints KeycloakConfig) gin.HandlerFunc {
-	return AuthChain(endpoints, accessCheckFunction)
+	return authChain(endpoints, accessCheckFunction)
 }
 
-func AuthChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunction) gin.HandlerFunc {
+func authChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunction) gin.HandlerFunc {
 	// middleware
 	return func(ctx *gin.Context) {
 		t := time.Now()
