@@ -110,7 +110,7 @@ func Test_RoleAccess_not_right_role(t *testing.T) {
 	authfunc(ctx)
 
 	assert.True(t, len(ctx.Errors) == 1)
-	assert.Equal(t, "Access to the Resource is fobidden", ctx.Errors[0].Err.Error())
+	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
 }
 
 func Test_RoleAccess_right_role(t *testing.T) {
@@ -141,7 +141,7 @@ func Test_RoleAccess_not_right_ud(t *testing.T) {
 	authfunc(ctx)
 
 	assert.True(t, len(ctx.Errors) == 1)
-	assert.Equal(t, "Access to the Resource is fobidden", ctx.Errors[0].Err.Error())
+	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
 }
 
 func Test_RoleAccess_auth_check(t *testing.T) {

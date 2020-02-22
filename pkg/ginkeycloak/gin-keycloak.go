@@ -202,7 +202,7 @@ func authChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunctio
 				}
 
 				if len(accessCheckFunctions)-1 == i {
-					ctx.AbortWithError(http.StatusForbidden, errors.New("Access to the Resource is fobidden"))
+					ctx.AbortWithError(http.StatusForbidden, errors.New("Access to the Resource is forbidden"))
 					varianceControl <- false
 					return
 				}
