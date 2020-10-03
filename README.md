@@ -66,7 +66,7 @@ team. We'll use a router group again:
 
 
 	privateGroup := router.Group("/api/privateGroup")
-	privateGroup.Use(ginkeycloak.Auth(ginkeycloak.GroupCheck(GRANTED_ROLE), keycloakconfig))
+	privateGroup.Use(ginkeycloak.Auth(ginkeycloak.AuthCheck(), keycloakconfig))
 	privateGroup.GET("/", func(c *gin.Context) {
 		....
 	})
@@ -161,7 +161,21 @@ Once again, you can use curl to test:
         curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/privateGroup/
         {"message":"Hello from private to sszuecs member of teapot"}
 
+### Realm-Based Access
 
+Realm Based Access is also possible and straightforward:
+
+        
+    var GRANTED_ROLE  = []string{"a-ream-role", "another-role"}
+
+configure it as follows:
+
+
+	privateGroup := router.Group("/api/privateGroup")
+	privateGroup.Use(ginkeycloak.Auth(ginkeycloak.RealmCheck(GRANTED_ROLE), keycloakconfig))
+	
+
+	
 ## Contributors
 
 Thanks to:

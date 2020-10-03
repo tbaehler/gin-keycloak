@@ -1,5 +1,3 @@
-// Package zalando contains Zalando specific definitions for
-// authorization.
 package ginkeycloak
 
 import (
@@ -17,8 +15,7 @@ type AccessTuple struct {
 func GroupCheck(at []AccessTuple) func(tc *TokenContainer, ctx *gin.Context) bool {
 	ats := at
 	return func(tc *TokenContainer, ctx *gin.Context) bool {
-		ctx.Set("token", *tc.KeyCloakToken)
-		ctx.Set("uid", tc.KeyCloakToken.PreferredUsername)
+		addTokenToContext(tc, ctx)
 		for idx := range ats {
 			at := ats[idx]
 			if tc.KeyCloakToken.ResourceAccess != nil {
@@ -34,11 +31,30 @@ func GroupCheck(at []AccessTuple) func(tc *TokenContainer, ctx *gin.Context) boo
 	}
 }
 
+func RealmCheck(allowedRoles []string) func(tc *TokenContainer, ctx *gin.Context) bool {
+
+	return func(tc *TokenContainer, ctx *gin.Context) bool {
+		addTokenToContext(tc, ctx)
+		for _, allowedRole := range allowedRoles {
+			for _, role := range tc.KeyCloakToken.RealmAccess.Roles {
+				if role == allowedRole {
+					return true
+				}
+			}
+		}
+		return false
+	}
+}
+
+func addTokenToContext(tc *TokenContainer, ctx *gin.Context) {
+	ctx.Set("token", *tc.KeyCloakToken)
+	ctx.Set("uid", tc.KeyCloakToken.PreferredUsername)
+}
+
 func UidCheck(at []AccessTuple) func(tc *TokenContainer, ctx *gin.Context) bool {
 	ats := at
 	return func(tc *TokenContainer, ctx *gin.Context) bool {
-		ctx.Set("token", *tc.KeyCloakToken)
-		ctx.Set("uid", tc.KeyCloakToken.PreferredUsername)
+		addTokenToContext(tc, ctx)
 		uid := tc.KeyCloakToken.PreferredUsername
 		for idx := range ats {
 			at := ats[idx]
@@ -50,10 +66,9 @@ func UidCheck(at []AccessTuple) func(tc *TokenContainer, ctx *gin.Context) bool 
 	}
 }
 
-func AuthCheck(at []AccessTuple) func(tc *TokenContainer, ctx *gin.Context) bool {
+func AuthCheck() func(tc *TokenContainer, ctx *gin.Context) bool {
 	return func(tc *TokenContainer, ctx *gin.Context) bool {
-		ctx.Set("token", *tc.KeyCloakToken)
-		ctx.Set("uid", tc.KeyCloakToken.PreferredUsername)
+		addTokenToContext(tc, ctx)
 		return true
 	}
 }

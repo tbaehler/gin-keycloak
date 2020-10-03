@@ -18,18 +18,13 @@ import (
 )
 
 // VarianceTimer controls the max runtime of Auth() and AuthChain() middleware
-var VarianceTimer time.Duration = 30000 * time.Millisecond
-var Transport = http.Transport{}
+var VarianceTimer = 30000 * time.Millisecond
 var publicKeyCache = cache.New(8*time.Hour, 8*time.Hour)
 
 // TokenContainer stores all relevant token information
 type TokenContainer struct {
 	Token         *oauth2.Token
 	KeyCloakToken *KeyCloakToken
-}
-
-type ServiceRole struct {
-	Roles []string `json:"roles"`
 }
 
 func extractToken(r *http.Request) (*oauth2.Token, error) {
@@ -202,7 +197,7 @@ func authChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunctio
 				}
 
 				if len(accessCheckFunctions)-1 == i {
-					ctx.AbortWithError(http.StatusForbidden, errors.New("Access to the Resource is forbidden"))
+					_ = ctx.AbortWithError(http.StatusForbidden, errors.New("Access to the Resource is forbidden"))
 					varianceControl <- false
 					return
 				}

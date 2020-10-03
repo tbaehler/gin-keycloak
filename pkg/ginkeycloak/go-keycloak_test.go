@@ -77,6 +77,7 @@ func TestMain(m *testing.M) {
 	token.ResourceAccess = make(map[string]ServiceRole)
 	token.ResourceAccess[serviceName] = ServiceRole{[]string{"test"}}
 	token.PreferredUsername = username
+	token.RealmAccess.Roles = []string{"a_realm_role", "another_realm_role"}
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: privKey}, (&jose.SignerOptions{}).WithType("JWT"))
 	if err != nil {
 		log.Fatal(err)
@@ -113,9 +114,30 @@ func Test_RoleAccess_not_right_role(t *testing.T) {
 	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
 }
 
+func Test_RealmAccess_not_right_role(t *testing.T) {
+	allowedRoles := []string{"anotherrole"}
+	authfunc := Auth(RealmCheck(allowedRoles), KeycloakConfig{})
+	ctx := buildContext()
+
+	authfunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 1)
+	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+}
+
 func Test_RoleAccess_right_role(t *testing.T) {
 	roles := []AccessTuple{{Service: serviceName, Role: "test"}}
 	authfunc := Auth(GroupCheck(roles), KeycloakConfig{})
+	ctx := buildContext()
+
+	authfunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 0)
+}
+
+func Test_RealmAccess_right_role(t *testing.T) {
+	roles := []string{"a_realm_role"}
+	authfunc := Auth(RealmCheck(roles), KeycloakConfig{})
 	ctx := buildContext()
 
 	authfunc(ctx)
@@ -145,8 +167,7 @@ func Test_RoleAccess_not_right_ud(t *testing.T) {
 }
 
 func Test_RoleAccess_auth_check(t *testing.T) {
-	authcheck := []AccessTuple{{Service: serviceName}}
-	authfunc := Auth(AuthCheck(authcheck), KeycloakConfig{})
+	authfunc := Auth(AuthCheck(), KeycloakConfig{})
 	ctx := buildContext()
 
 	authfunc(ctx)
