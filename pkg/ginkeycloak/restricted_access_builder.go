@@ -6,10 +6,10 @@ import (
 )
 
 type BuilderConfig struct {
-	service              string
-	url                  string
-	realm                string
-	disableSecurityCheck bool
+	Service              string
+	Url                  string
+	Realm                string
+	DisableSecurityCheck bool
 }
 
 type RestrictedAccessBuilder interface {
@@ -32,12 +32,12 @@ func NewAcessBuilder(config BuilderConfig) RestrictedAccessBuilder {
 }
 
 func (builder restrictedAccessBuilderImpl) RestrictButForRole(role string) RestrictedAccessBuilder {
-	builder.allowedRoles = append(builder.allowedRoles, AccessTuple{Service: builder.config.service, Role: string(role)})
+	builder.allowedRoles = append(builder.allowedRoles, AccessTuple{Service: builder.config.Service, Role: string(role)})
 	return builder
 }
 
 func (builder restrictedAccessBuilderImpl) RestrictButForUid(uid string) RestrictedAccessBuilder {
-	builder.allowedUids = append(builder.allowedUids, AccessTuple{Service: builder.config.service, Uid: uid})
+	builder.allowedUids = append(builder.allowedUids, AccessTuple{Service: builder.config.Service, Uid: uid})
 	return builder
 }
 
@@ -47,7 +47,7 @@ func (builder restrictedAccessBuilderImpl) RestrictButForRealm(realmName string)
 }
 
 func (builder restrictedAccessBuilderImpl) Build() gin.HandlerFunc {
-	if builder.config.disableSecurityCheck {
+	if builder.config.DisableSecurityCheck {
 		glog.Warningf("[ginkeycloak] access check is disabled")
 		return func(ctx *gin.Context) {}
 	}
@@ -56,8 +56,8 @@ func (builder restrictedAccessBuilderImpl) Build() gin.HandlerFunc {
 
 func (builder restrictedAccessBuilderImpl) keycloakConfig() KeycloakConfig {
 	return KeycloakConfig{
-		Url:   builder.config.url,
-		Realm: builder.config.realm,
+		Url:   builder.config.Url,
+		Realm: builder.config.Realm,
 	}
 }
 

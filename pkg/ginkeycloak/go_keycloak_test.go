@@ -64,8 +64,8 @@ const validUsername = "u123456"
 const validRole = "test"
 const invalidRole = "another role"
 const invalidUsername = "another user"
-const invalidRealm = "invalid realm role"
-const validRealmRole = "a valid realm role"
+const invalidRealm = "invalid Realm role"
+const validRealmRole = "a valid Realm role"
 
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
@@ -84,7 +84,7 @@ func TestMain(m *testing.M) {
 	token.ResourceAccess = make(map[string]ServiceRole)
 	token.ResourceAccess[serviceName] = ServiceRole{[]string{validRole}}
 	token.PreferredUsername = validUsername
-	token.RealmAccess.Roles = []string{validRealmRole, "second valid realm role"}
+	token.RealmAccess.Roles = []string{validRealmRole, "second valid Realm role"}
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: privKey}, (&jose.SignerOptions{}).WithType("JWT"))
 	if err != nil {
 		log.Fatal(err)
@@ -109,9 +109,9 @@ func TestMain(m *testing.M) {
 	_ = publicKeyCache.Add(raw.Headers[0].KeyID, Certs{Keys: []KeyEntry{ke}}, time.Minute)
 
 	builderConfiig = BuilderConfig{
-		service: serviceName,
-		url:     "",
-		realm:   "",
+		Service: serviceName,
+		Url:     "",
+		Realm:   "",
 	}
 
 	os.Exit(m.Run())
