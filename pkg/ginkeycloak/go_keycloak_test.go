@@ -57,8 +57,15 @@ kwIDAQAB
 -----END PUBLIC KEY-----`
 
 var signedToken string
-var serviceName = "myService"
-var username = "u123456"
+var builderConfiig BuilderConfig
+
+const serviceName = "myService"
+const validUsername = "u123456"
+const validRole = "test"
+const invalidRole = "another role"
+const invalidUsername = "another user"
+const invalidRealm = "invalid realm role"
+const validRealmRole = "a valid realm role"
 
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
@@ -75,9 +82,9 @@ func TestMain(m *testing.M) {
 	token := KeyCloakToken{}
 	token.Exp = expiredDate.Unix()
 	token.ResourceAccess = make(map[string]ServiceRole)
-	token.ResourceAccess[serviceName] = ServiceRole{[]string{"test"}}
-	token.PreferredUsername = username
-	token.RealmAccess.Roles = []string{"a_realm_role", "another_realm_role"}
+	token.ResourceAccess[serviceName] = ServiceRole{[]string{validRole}}
+	token.PreferredUsername = validUsername
+	token.RealmAccess.Roles = []string{validRealmRole, "second valid realm role"}
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: privKey}, (&jose.SignerOptions{}).WithType("JWT"))
 	if err != nil {
 		log.Fatal(err)
@@ -100,70 +107,83 @@ func TestMain(m *testing.M) {
 		E:   base64.RawURLEncoding.EncodeToString(be.Bytes()),
 	}
 	_ = publicKeyCache.Add(raw.Headers[0].KeyID, Certs{Keys: []KeyEntry{ke}}, time.Minute)
+
+	builderConfiig = BuilderConfig{
+		service: serviceName,
+		url:     "",
+		realm:   "",
+	}
+
 	os.Exit(m.Run())
 }
 
-func Test_RoleAccess_not_right_role(t *testing.T) {
-	roles := []AccessTuple{{Service: serviceName, Role: "anotherrole"}}
-	authfunc := Auth(GroupCheck(roles), KeycloakConfig{})
+func Test_RoleAccess_invalid_role(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForRole(invalidRole).
+		Build()
 	ctx := buildContext()
 
-	authfunc(ctx)
+	authFunc(ctx)
 
 	assert.True(t, len(ctx.Errors) == 1)
 	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
 }
 
-func Test_RealmAccess_not_right_role(t *testing.T) {
-	allowedRoles := []string{"anotherrole"}
-	authfunc := Auth(RealmCheck(allowedRoles), KeycloakConfig{})
+func Test_RealmAccess_invalid_realm(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForRealm(invalidRealm).
+		Build()
 	ctx := buildContext()
 
-	authfunc(ctx)
+	authFunc(ctx)
 
 	assert.True(t, len(ctx.Errors) == 1)
 	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
 }
 
-func Test_RoleAccess_right_role(t *testing.T) {
-	roles := []AccessTuple{{Service: serviceName, Role: "test"}}
-	authfunc := Auth(GroupCheck(roles), KeycloakConfig{})
+func Test_UidAccess_invalid_uid(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForUid(invalidRole).
+		Build()
 	ctx := buildContext()
 
-	authfunc(ctx)
-
-	assert.True(t, len(ctx.Errors) == 0)
-}
-
-func Test_RealmAccess_right_role(t *testing.T) {
-	roles := []string{"a_realm_role"}
-	authfunc := Auth(RealmCheck(roles), KeycloakConfig{})
-	ctx := buildContext()
-
-	authfunc(ctx)
-
-	assert.True(t, len(ctx.Errors) == 0)
-}
-
-func Test_RoleAccess_right_uid(t *testing.T) {
-	uids := []AccessTuple{{Service: serviceName, Uid: username}}
-	authfunc := Auth(UidCheck(uids), KeycloakConfig{})
-	ctx := buildContext()
-
-	authfunc(ctx)
-
-	assert.True(t, len(ctx.Errors) == 0)
-}
-
-func Test_RoleAccess_not_right_ud(t *testing.T) {
-	uids := []AccessTuple{{Service: serviceName, Uid: "another"}}
-	authfunc := Auth(UidCheck(uids), KeycloakConfig{})
-	ctx := buildContext()
-
-	authfunc(ctx)
+	authFunc(ctx)
 
 	assert.True(t, len(ctx.Errors) == 1)
 	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+}
+
+func Test_RoleAccess_valid_role(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForRole(validRole).
+		Build()
+	ctx := buildContext()
+
+	authFunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 0)
+}
+
+func Test_RealmAccess_valid_realm(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForRealm(validRealmRole).
+		Build()
+	ctx := buildContext()
+
+	authFunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 0)
+}
+
+func Test_UidAccess_valid_uid(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForUid(validUsername).
+		Build()
+	ctx := buildContext()
+
+	authFunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 0)
 }
 
 func Test_RoleAccess_auth_check(t *testing.T) {
@@ -171,6 +191,82 @@ func Test_RoleAccess_auth_check(t *testing.T) {
 	ctx := buildContext()
 
 	authfunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 0)
+}
+
+func Test_Auth_no_config(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).Build()
+	ctx := buildContext()
+
+	authFunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 1)
+	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+}
+
+func Test_Auth_all_invalid(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForUid(invalidUsername).
+		RestrictButForRole(invalidRole).
+		RestrictButForRealm(invalidRealm).
+		Build()
+	ctx := buildContext()
+
+	authFunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 1)
+	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+}
+
+func Test_Auth_all_invalid_but_uid(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForUid(validUsername).
+		RestrictButForRole(invalidRole).
+		RestrictButForRealm(invalidRealm).
+		Build()
+	ctx := buildContext()
+
+	authFunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 0)
+}
+
+func Test_Auth_all_invalid_but_role(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForUid(invalidUsername).
+		RestrictButForRole(validRole).
+		RestrictButForRealm(invalidRealm).
+		Build()
+	ctx := buildContext()
+
+	authFunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 0)
+}
+
+func Test_Auth_all_invalid_but_realm(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForUid(invalidUsername).
+		RestrictButForRole(invalidRole).
+		RestrictButForRealm(validRealmRole).
+		Build()
+	ctx := buildContext()
+
+	authFunc(ctx)
+
+	assert.True(t, len(ctx.Errors) == 0)
+}
+
+func Test_Auth_all_valid(t *testing.T) {
+	authFunc := NewAcessBuilder(builderConfiig).
+		RestrictButForUid(validUsername).
+		RestrictButForRole(validRole).
+		RestrictButForRealm(validRealmRole).
+		Build()
+	ctx := buildContext()
+
+	authFunc(ctx)
 
 	assert.True(t, len(ctx.Errors) == 0)
 }

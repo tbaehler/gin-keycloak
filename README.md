@@ -78,36 +78,22 @@ Once again, you can use curl to test:
 
 ### Uid-Based Access
 
-First, define your access triples to identify who has access to a
-given resource. This snippet shows how to grant resource access to two
-hypothetical employees:
+Restrict all access but for a few users
 
-    //from ginkeycloak package
-    // AccessTuple is the type defined for use in AccessTuples.
-      
-            type AccessTuple struct {
-           	    Service string
-           	    Role    string
-           	    Uid     string
-            }
-        
-    var GRANTED_USERS  = []ginkeycloak.AccessTuple{{Uid: "domain\user1"}}
-
-
-Next, define which Gin middlewares you use. The third line in this
-snippet is a basic audit log:
-
+    config := ginkeycloak.BuilderConfig{
+              		service:              <yourServicename>,
+              		url:                  "<your token url>",
+              		realm:                "<your realm to get the public keys>",
+              }
+    
 	router := gin.New()
-	router.Use(ginglog.Logger(3 * time.Second))
-	router.Use(ginkeycloak.RequestLogger([]string{"uid"}, "data"))
-	router.Use(gin.Recovery())
-
-Finally, define which type of access you grant to the defined
-users. We'll use a router group, so that we can add a bunch of router
-paths and HTTP verbs:
-
 	privateUser := router.Group("/api/privateUser")
-	privateUser.Use(ginkeycloak.Auth(ginkeycloak.UidCheck(USERS), keycloakConfig))
+	
+	privateUser.Use(ginkeycloak.NewAcessBuilder(config).
+        RestrictButForUid("domain\user1").
+        RestrictButForUid("domain\user2").
+        Build())
+        
 	privateUser.GET("/", func(c *gin.Context) {
 		....
 	})
@@ -121,44 +107,30 @@ To test, you can use curl:
 
 ### Role-Based Access
 
-As with Uid-based access, define your access triples to identify who
-has access to a given resource. With this snippet, you can grant resource
-access to an entire team instead of individuals:
+Restrict all access but for the given roles
 
         
-    var GRANTED_ROLE  = []ginkeycloak.AccessTuple{
-	    {Service: "keycloak-service", Role: "keycloak-role"},
-    }
-
-
-Now define which Gin middlewares you use:
-
-	router := gin.New()
-	router.Use(ginglog.Logger(3 * time.Second))
-	router.Use(ginkeycloak.RequestLogger([]string{"uid"}, "data"))
-	router.Use(gin.Recovery())
-
-A Keycloakconfig
-
-    var sbbEndpoint = ginkeycloak.KeycloakConfig{
-	    Url:  "https://keycloack.domain.ch/",
-	    Realm: "Your Realm",
-    }
-
-Lastly, define which type of access you grant to the defined
-team. We'll use a router group again:
-
-
-	privateGroup := router.Group("/api/privateGroup")
-	privateGroup.Use(ginkeycloak.Auth(ginkeycloak.GroupCheck(GRANTED_ROLE), keycloakconfig))
-	privateGroup.GET("/", func(c *gin.Context) {
-		uid, okUid := c.Get("uid")
-		....
-	})
+    config := ginkeycloak.BuilderConfig{
+                  		service:              <yourServicename>,
+                  		url:                  "<your token url>",
+                  		realm:                "<your realm to get the public keys>",
+                  }
+        
+    router := gin.New()
+    privateUser := router.Group("/api/privateUser")
+    
+    privateUser.Use(ginkeycloak.NewAcessBuilder(config).
+        RestrictButForRole("role1").
+        RestrictButForRole("role2").
+        Build())
+        
+    privateUser.GET("/", func(c *gin.Context) {
+    	....
+    })
 
 Once again, you can use curl to test:
 
-        curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/privateGroup/
+    curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/privateGroup/
         {"message":"Hello from private to sszuecs member of teapot"}
 
 ### Realm-Based Access
@@ -166,14 +138,22 @@ Once again, you can use curl to test:
 Realm Based Access is also possible and straightforward:
 
         
-    var GRANTED_ROLE  = []string{"a-ream-role", "another-role"}
-
-configure it as follows:
-
-
-	privateGroup := router.Group("/api/privateGroup")
-	privateGroup.Use(ginkeycloak.Auth(ginkeycloak.RealmCheck(GRANTED_ROLE), keycloakconfig))
-	
+    config := ginkeycloak.BuilderConfig{
+                      		service:              <yourServicename>,
+                      		url:                  "<your token url>",
+                      		realm:                "<your realm to get the public keys>",
+                      }
+            
+    router := gin.New()
+    privateUser := router.Group("/api/privateUser")
+    
+    privateUser.Use(ginkeycloak.NewAcessBuilder(config).
+        RestrictButForRealm("realmRole").
+        Build())
+        
+    privateUser.GET("/", func(c *gin.Context) {
+    	....
+    })
 
 	
 ## Contributors
