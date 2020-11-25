@@ -60,7 +60,7 @@ func GetTokenContainer(token *oauth2.Token, config KeycloakConfig) (*TokenContai
 func getPublicKey(keyId string, config KeycloakConfig) (string, string, error) {
 	keyEntry, exists := publicKeyCache.Get(keyId)
 	if !exists {
-		url := config.Url + "/auth/allowedRealms/" + config.Realm + "/protocol/openid-connect/certs"
+		url := config.Url + "/auth/realms/" + config.Realm + "/protocol/openid-connect/certs"
 
 		resp, err := http.Get(url)
 		if err != nil {
