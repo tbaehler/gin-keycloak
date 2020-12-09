@@ -89,7 +89,7 @@ Restrict all access but for a few users
 	router := gin.New()
 	privateUser := router.Group("/api/privateUser")
 	
-	privateUser.Use(ginkeycloak.NewAcessBuilder(config).
+	privateUser.Use(ginkeycloak.NewAccessBuilder(config).
         RestrictButForUid("domain\user1").
         RestrictButForUid("domain\user2").
         Build())
@@ -119,7 +119,7 @@ Restrict all access but for the given roles
     router := gin.New()
     privateUser := router.Group("/api/privateUser")
     
-    privateUser.Use(ginkeycloak.NewAcessBuilder(config).
+    privateUser.Use(ginkeycloak.NewAccessBuilder(config).
         RestrictButForRole("role1").
         RestrictButForRole("role2").
         Build())
@@ -147,7 +147,7 @@ Realm Based Access is also possible and straightforward:
     router := gin.New()
     privateUser := router.Group("/api/privateUser")
     
-    privateUser.Use(ginkeycloak.NewAcessBuilder(config).
+    privateUser.Use(ginkeycloak.NewAccessBuilder(config).
         RestrictButForRealm("realmRole").
         Build())
         
