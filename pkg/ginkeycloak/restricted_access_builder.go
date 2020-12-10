@@ -26,7 +26,7 @@ type restrictedAccessBuilderImpl struct {
 	config        BuilderConfig
 }
 
-func NewAcessBuilder(config BuilderConfig) RestrictedAccessBuilder {
+func NewAccessBuilder(config BuilderConfig) RestrictedAccessBuilder {
 	builder := restrictedAccessBuilderImpl{config: config, allowedRoles: []AccessTuple{}}
 	return builder
 }

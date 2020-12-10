@@ -118,7 +118,7 @@ func TestMain(m *testing.M) {
 }
 
 func Test_RoleAccess_invalid_role(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForRole(invalidRole).
 		Build()
 	ctx := buildContext()
@@ -130,7 +130,7 @@ func Test_RoleAccess_invalid_role(t *testing.T) {
 }
 
 func Test_RealmAccess_invalid_realm(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForRealm(invalidRealm).
 		Build()
 	ctx := buildContext()
@@ -142,7 +142,7 @@ func Test_RealmAccess_invalid_realm(t *testing.T) {
 }
 
 func Test_UidAccess_invalid_uid(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForUid(invalidRole).
 		Build()
 	ctx := buildContext()
@@ -154,7 +154,7 @@ func Test_UidAccess_invalid_uid(t *testing.T) {
 }
 
 func Test_RoleAccess_valid_role(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForRole(validRole).
 		Build()
 	ctx := buildContext()
@@ -165,7 +165,7 @@ func Test_RoleAccess_valid_role(t *testing.T) {
 }
 
 func Test_RealmAccess_valid_realm(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForRealm(validRealmRole).
 		Build()
 	ctx := buildContext()
@@ -176,7 +176,7 @@ func Test_RealmAccess_valid_realm(t *testing.T) {
 }
 
 func Test_UidAccess_valid_uid(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForUid(validUsername).
 		Build()
 	ctx := buildContext()
@@ -196,7 +196,7 @@ func Test_RoleAccess_auth_check(t *testing.T) {
 }
 
 func Test_Auth_no_config(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).Build()
+	authFunc := NewAccessBuilder(builderConfiig).Build()
 	ctx := buildContext()
 
 	authFunc(ctx)
@@ -206,7 +206,7 @@ func Test_Auth_no_config(t *testing.T) {
 }
 
 func Test_Auth_all_invalid(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForUid(invalidUsername).
 		RestrictButForRole(invalidRole).
 		RestrictButForRealm(invalidRealm).
@@ -220,7 +220,7 @@ func Test_Auth_all_invalid(t *testing.T) {
 }
 
 func Test_Auth_all_invalid_but_uid(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForUid(validUsername).
 		RestrictButForRole(invalidRole).
 		RestrictButForRealm(invalidRealm).
@@ -233,7 +233,7 @@ func Test_Auth_all_invalid_but_uid(t *testing.T) {
 }
 
 func Test_Auth_all_invalid_but_role(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForUid(invalidUsername).
 		RestrictButForRole(validRole).
 		RestrictButForRealm(invalidRealm).
@@ -246,7 +246,7 @@ func Test_Auth_all_invalid_but_role(t *testing.T) {
 }
 
 func Test_Auth_all_invalid_but_realm(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForUid(invalidUsername).
 		RestrictButForRole(invalidRole).
 		RestrictButForRealm(validRealmRole).
@@ -259,7 +259,7 @@ func Test_Auth_all_invalid_but_realm(t *testing.T) {
 }
 
 func Test_Auth_all_valid(t *testing.T) {
-	authFunc := NewAcessBuilder(builderConfiig).
+	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForUid(validUsername).
 		RestrictButForRole(validRole).
 		RestrictButForRealm(validRealmRole).
