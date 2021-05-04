@@ -5,10 +5,11 @@ type Certs struct {
 }
 
 type KeyEntry struct {
-	Kid string `json:"kid"`
-	Kty string `json:"kty"`
-	Alg string `json:"alg"`
-	Use string `json:"use"`
-	N   string `json:"n"`
-	E   string `json:"e"`
+	Kid string   `json:"kid"`
+	Kty string   `json:"kty"`
+	Alg string   `json:"alg"`
+	Use string   `json:"use"`
+	N   string   `json:"n"`
+	E   string   `json:"e"`
+	X5C []string `json:"x5c"`
 }
