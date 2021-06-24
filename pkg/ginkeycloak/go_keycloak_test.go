@@ -1,6 +1,9 @@
 package ginkeycloak
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -56,7 +59,8 @@ TgcQCPfT9yoXK7uGjv4Hhiq1JP/AXj8xyt+xlJSPr7C2Q/WBJVvpjxAFFDccsKni
 kwIDAQAB
 -----END PUBLIC KEY-----`
 
-var signedToken string
+var dummyECKey, _ = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
 var builderConfiig BuilderConfig
 
 const serviceName = "myService"
@@ -67,47 +71,16 @@ const invalidUsername = "another user"
 const invalidRealm = "invalid Realm role"
 const validRealmRole = "a valid Realm role"
 
+var tokens []string
+
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
-	var err error
-	pubBlock, _ := pem.Decode([]byte(dummyPublicKey))
-	pubKey, err := x509.ParsePKIXPublicKey(pubBlock.Bytes)
-	if err != nil {
-		log.Fatal(err)
-	}
-	privBlock, _ := pem.Decode([]byte(dummyPrivateKey))
-	privKey, _ := x509.ParsePKCS1PrivateKey(privBlock.Bytes)
 
 	expiredDate := time.Now().Add(time.Minute * 1)
-	token := KeyCloakToken{}
-	token.Exp = expiredDate.Unix()
-	token.ResourceAccess = make(map[string]ServiceRole)
-	token.ResourceAccess[serviceName] = ServiceRole{[]string{validRole}}
-	token.PreferredUsername = validUsername
-	token.RealmAccess.Roles = []string{validRealmRole, "second valid Realm role"}
-	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: privKey}, (&jose.SignerOptions{}).WithType("JWT"))
-	if err != nil {
-		log.Fatal(err)
-	}
+	token := createToken(expiredDate)
 
-	signedToken, err = jwt.Signed(sig).Claims(&token).CompactSerialize()
-	if err != nil {
-		panic(err)
-	}
-
-	raw, _ := jwt.ParseSigned(signedToken)
-	publicKey := pubKey.(*rsa.PublicKey)
-	be := big.NewInt(int64(publicKey.E))
-	ke := KeyEntry{
-		Kid: "",
-		Kty: "RSA",
-		Alg: "RS256",
-		Use: "sig",
-		N:   base64.RawURLEncoding.EncodeToString(publicKey.N.Bytes()),
-		E:   base64.RawURLEncoding.EncodeToString(be.Bytes()),
-	}
-	_ = publicKeyCache.Add(raw.Headers[0].KeyID, Certs{Keys: []KeyEntry{ke}}, time.Minute)
-
+	setupRSA(token)
+	SetupEC(token)
 	builderConfiig = BuilderConfig{
 		Service: serviceName,
 		Url:     "",
@@ -117,92 +90,177 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func setupRSA(token KeyCloakToken) {
+	pubBlock, _ := pem.Decode([]byte(dummyPublicKey))
+	pubKey, err := x509.ParsePKIXPublicKey(pubBlock.Bytes)
+	if err != nil {
+		log.Fatal(err)
+	}
+	privBlock, _ := pem.Decode([]byte(dummyPrivateKey))
+	privKey, _ := x509.ParsePKCS1PrivateKey(privBlock.Bytes)
+
+	sigRsa, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: privKey}, (&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "1"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	signedTokenRsa, err := jwt.Signed(sigRsa).Claims(&token).CompactSerialize()
+	if err != nil {
+		panic(err)
+	}
+
+	raw, _ := jwt.ParseSigned(signedTokenRsa)
+	publicKey := pubKey.(*rsa.PublicKey)
+	be := big.NewInt(int64(publicKey.E))
+	ke := KeyEntry{
+		Kid: "1",
+		Kty: "RSA",
+		Alg: "RS256",
+		Use: "sig",
+		N:   base64.RawURLEncoding.EncodeToString(publicKey.N.Bytes()),
+		E:   base64.RawURLEncoding.EncodeToString(be.Bytes()),
+	}
+	_ = publicKeyCache.Add(raw.Headers[0].KeyID, ke, time.Minute)
+
+	tokens = append(tokens, signedTokenRsa)
+}
+
+func createToken(expiredDate time.Time) KeyCloakToken {
+	token := KeyCloakToken{}
+	token.Exp = expiredDate.Unix()
+	token.ResourceAccess = make(map[string]ServiceRole)
+	token.ResourceAccess[serviceName] = ServiceRole{[]string{validRole}}
+	token.PreferredUsername = validUsername
+	token.RealmAccess.Roles = []string{validRealmRole, "second valid Realm role"}
+	return token
+}
+
+func SetupEC(token KeyCloakToken) {
+	sigEc, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: dummyECKey}, (&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "2"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	signedTokenEc, err := jwt.Signed(sigEc).Claims(&token).CompactSerialize()
+	if err != nil {
+		panic(err)
+	}
+	raw, _ := jwt.ParseSigned(signedTokenEc)
+	ke := KeyEntry{
+		Kid: "2",
+		Kty: "EC",
+		Alg: "ES256",
+		Crv: "P-256",
+		Use: "sig",
+		X:   base64.RawURLEncoding.EncodeToString(dummyECKey.X.Bytes()),
+		Y:   base64.RawURLEncoding.EncodeToString(dummyECKey.Y.Bytes()),
+	}
+	_ = publicKeyCache.Add(raw.Headers[0].KeyID, ke, time.Minute)
+	tokens = append(tokens, signedTokenEc)
+}
+
 func Test_RoleAccess_invalid_role(t *testing.T) {
 	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForRole(invalidRole).
 		Build()
-	ctx := buildContext()
 
-	authFunc(ctx)
+	for _, token := range tokens {
+		ctx := buildContext(token)
 
-	assert.True(t, len(ctx.Errors) == 1)
-	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+		authFunc(ctx)
+
+		assert.True(t, len(ctx.Errors) == 1)
+		assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+	}
 }
 
 func Test_RealmAccess_invalid_realm(t *testing.T) {
 	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForRealm(invalidRealm).
 		Build()
-	ctx := buildContext()
 
-	authFunc(ctx)
+	for _, token := range tokens {
+		ctx := buildContext(token)
 
-	assert.True(t, len(ctx.Errors) == 1)
-	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+		authFunc(ctx)
+
+		assert.True(t, len(ctx.Errors) == 1)
+		assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+	}
 }
 
 func Test_UidAccess_invalid_uid(t *testing.T) {
 	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForUid(invalidRole).
 		Build()
-	ctx := buildContext()
 
-	authFunc(ctx)
+	for _, token := range tokens {
+		ctx := buildContext(token)
+		authFunc(ctx)
 
-	assert.True(t, len(ctx.Errors) == 1)
-	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+		assert.True(t, len(ctx.Errors) == 1)
+		assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+	}
 }
 
 func Test_RoleAccess_valid_role(t *testing.T) {
 	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForRole(validRole).
 		Build()
-	ctx := buildContext()
 
-	authFunc(ctx)
+	for _, token := range tokens {
+		ctx := buildContext(token)
 
-	assert.True(t, len(ctx.Errors) == 0)
+		authFunc(ctx)
+
+		assert.True(t, len(ctx.Errors) == 0)
+	}
 }
 
 func Test_RealmAccess_valid_realm(t *testing.T) {
 	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForRealm(validRealmRole).
 		Build()
-	ctx := buildContext()
 
-	authFunc(ctx)
+	for _, token := range tokens {
+		ctx := buildContext(token)
 
-	assert.True(t, len(ctx.Errors) == 0)
+		authFunc(ctx)
+
+		assert.True(t, len(ctx.Errors) == 0)
+	}
 }
 
 func Test_UidAccess_valid_uid(t *testing.T) {
 	authFunc := NewAccessBuilder(builderConfiig).
 		RestrictButForUid(validUsername).
 		Build()
-	ctx := buildContext()
+	for _, token := range tokens {
+		ctx := buildContext(token)
+		authFunc(ctx)
 
-	authFunc(ctx)
-
-	assert.True(t, len(ctx.Errors) == 0)
+		assert.True(t, len(ctx.Errors) == 0)
+	}
 }
 
 func Test_RoleAccess_auth_check(t *testing.T) {
 	authfunc := Auth(AuthCheck(), KeycloakConfig{})
-	ctx := buildContext()
+	for _, token := range tokens {
+		ctx := buildContext(token)
+		authfunc(ctx)
 
-	authfunc(ctx)
-
-	assert.True(t, len(ctx.Errors) == 0)
+		assert.True(t, len(ctx.Errors) == 0)
+	}
 }
 
 func Test_Auth_no_config(t *testing.T) {
 	authFunc := NewAccessBuilder(builderConfiig).Build()
-	ctx := buildContext()
+	for _, token := range tokens {
+		ctx := buildContext(token)
 
-	authFunc(ctx)
+		authFunc(ctx)
 
-	assert.True(t, len(ctx.Errors) == 1)
-	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+		assert.True(t, len(ctx.Errors) == 1)
+		assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+	}
 }
 
 func Test_Auth_all_invalid(t *testing.T) {
@@ -211,12 +269,15 @@ func Test_Auth_all_invalid(t *testing.T) {
 		RestrictButForRole(invalidRole).
 		RestrictButForRealm(invalidRealm).
 		Build()
-	ctx := buildContext()
 
-	authFunc(ctx)
+	for _, token := range tokens {
+		ctx := buildContext(token)
 
-	assert.True(t, len(ctx.Errors) == 1)
-	assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+		authFunc(ctx)
+
+		assert.True(t, len(ctx.Errors) == 1)
+		assert.Equal(t, "Access to the Resource is forbidden", ctx.Errors[0].Err.Error())
+	}
 }
 
 func Test_Auth_all_invalid_but_uid(t *testing.T) {
@@ -225,11 +286,14 @@ func Test_Auth_all_invalid_but_uid(t *testing.T) {
 		RestrictButForRole(invalidRole).
 		RestrictButForRealm(invalidRealm).
 		Build()
-	ctx := buildContext()
 
-	authFunc(ctx)
+	for _, token := range tokens {
+		ctx := buildContext(token)
 
-	assert.True(t, len(ctx.Errors) == 0)
+		authFunc(ctx)
+
+		assert.True(t, len(ctx.Errors) == 0)
+	}
 }
 
 func Test_Auth_all_invalid_but_role(t *testing.T) {
@@ -238,11 +302,13 @@ func Test_Auth_all_invalid_but_role(t *testing.T) {
 		RestrictButForRole(validRole).
 		RestrictButForRealm(invalidRealm).
 		Build()
-	ctx := buildContext()
+	for _, token := range tokens {
+		ctx := buildContext(token)
 
-	authFunc(ctx)
+		authFunc(ctx)
 
-	assert.True(t, len(ctx.Errors) == 0)
+		assert.True(t, len(ctx.Errors) == 0)
+	}
 }
 
 func Test_Auth_all_invalid_but_realm(t *testing.T) {
@@ -251,11 +317,13 @@ func Test_Auth_all_invalid_but_realm(t *testing.T) {
 		RestrictButForRole(invalidRole).
 		RestrictButForRealm(validRealmRole).
 		Build()
-	ctx := buildContext()
+	for _, token := range tokens {
+		ctx := buildContext(token)
 
-	authFunc(ctx)
+		authFunc(ctx)
 
-	assert.True(t, len(ctx.Errors) == 0)
+		assert.True(t, len(ctx.Errors) == 0)
+	}
 }
 
 func Test_Auth_all_valid(t *testing.T) {
@@ -264,20 +332,21 @@ func Test_Auth_all_valid(t *testing.T) {
 		RestrictButForRole(validRole).
 		RestrictButForRealm(validRealmRole).
 		Build()
-	ctx := buildContext()
 
-	authFunc(ctx)
-
-	assert.True(t, len(ctx.Errors) == 0)
+	for _, token := range tokens {
+		ctx := buildContext(token)
+		authFunc(ctx)
+		assert.True(t, len(ctx.Errors) == 0)
+	}
 }
 
-func buildContext() *gin.Context {
+func buildContext(token string) *gin.Context {
 	resp := httptest.NewRecorder()
 	ctx, r := gin.CreateTestContext(resp)
 	r.GET("", func(c *gin.Context) {
 		c.Status(200)
 	})
 	ctx.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-	ctx.Request.Header.Set("Authorization", "Bearer "+signedToken)
+	ctx.Request.Header.Set("Authorization", "Bearer "+token)
 	return ctx
 }

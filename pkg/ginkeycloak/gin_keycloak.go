@@ -1,6 +1,8 @@
 package ginkeycloak
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
@@ -60,40 +62,86 @@ func GetTokenContainer(token *oauth2.Token, config KeycloakConfig) (*TokenContai
 	}, nil
 }
 
-func getPublicKey(keyId string, config KeycloakConfig) (string, string, error) {
-	keyEntry, exists := publicKeyCache.Get(keyId)
-	if !exists {
-		u, _ := url.Parse(config.Url)
-		u.Path = path.Join(u.Path, "auth/realms", config.Realm, "protocol/openid-connect/certs")
-		url := u.String()
+func getPublicKey(keyId string, config KeycloakConfig) (interface{}, error) {
 
-		resp, err := http.Get(url)
-		if err != nil {
-			return "", "", err
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
+	keyEntry, err := getPublicKeyFromCacheOrBackend(keyId, config)
+	if err != nil {
+		return nil, err
+	}
+	if strings.ToUpper(keyEntry.Kty) == "RSA" {
+		n, _ := base64.RawURLEncoding.DecodeString(keyEntry.N)
+		bigN := new(big.Int)
+		bigN.SetBytes(n)
+		e, _ := base64.RawURLEncoding.DecodeString(keyEntry.E)
+		bigE := new(big.Int)
+		bigE.SetBytes(e)
+		return &rsa.PublicKey{bigN, int(bigE.Int64())}, nil
+	} else if strings.ToUpper(keyEntry.Kty) == "EC" {
+		x, _ := base64.RawURLEncoding.DecodeString(keyEntry.X)
+		bigX := new(big.Int)
+		bigX.SetBytes(x)
+		y, _ := base64.RawURLEncoding.DecodeString(keyEntry.Y)
+		bigY := new(big.Int)
+		bigY.SetBytes(y)
 
-		var certs Certs
-		err = json.Unmarshal(body, &certs)
-		if err != nil {
-			return "", "", err
-		}
-		if len(certs.Keys) == 0 {
-			return "", "", errors.New("No public keys found")
+		var curve elliptic.Curve
+		crv := strings.ToUpper(keyEntry.Crv)
+		switch crv {
+		case "P-224":
+			curve = elliptic.P224()
+		case "P-256":
+			curve = elliptic.P256()
+		case "P-384":
+			curve = elliptic.P384()
+		case "P-521":
+			curve = elliptic.P521()
+		default:
+			return nil, errors.New("EC curve algorithm not supported " + keyEntry.Kty)
 		}
 
-		keyEntry = certs
-		publicKeyCache.Set(keyId, keyEntry, cache.DefaultExpiration)
+		return &ecdsa.PublicKey{
+			Curve: curve,
+			X:     bigX,
+			Y:     bigY,
+		}, nil
 	}
 
-	for _, keyIdFromServer := range keyEntry.(Certs).Keys {
+	return nil, errors.New("no support for keys of type " + keyEntry.Kty)
+}
+
+func getPublicKeyFromCacheOrBackend(keyId string, config KeycloakConfig) (KeyEntry, error) {
+	entry, exists := publicKeyCache.Get(keyId)
+	if exists {
+		return entry.(KeyEntry), nil
+	}
+
+	u, err := url.Parse(config.Url)
+	if err != nil {
+		return KeyEntry{}, err
+	}
+	u.Path = path.Join(u.Path, "auth/realms", config.Realm, "protocol/openid-connect/certs")
+
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return KeyEntry{}, err
+	}
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	var certs Certs
+	err = json.Unmarshal(body, &certs)
+	if err != nil {
+		return KeyEntry{}, err
+	}
+
+	for _, keyIdFromServer := range certs.Keys {
 		if keyIdFromServer.Kid == keyId {
-			return keyIdFromServer.N, keyIdFromServer.E, nil
+			publicKeyCache.Set(keyId, keyIdFromServer, cache.DefaultExpiration)
+			return keyIdFromServer, nil
 		}
 	}
 
-	return "", "", errors.New("no key found")
+	return KeyEntry{}, errors.New("No public key found with kid " + keyId + " found")
 }
 
 func decodeToken(token *oauth2.Token, config KeycloakConfig) (*KeyCloakToken, error) {
@@ -104,21 +152,13 @@ func decodeToken(token *oauth2.Token, config KeycloakConfig) (*KeyCloakToken, er
 		glog.Errorf("[Gin-OAuth] jwt not decodable: %s", err)
 		return nil, err
 	}
-	n, e, err := getPublicKey(parsedJWT.Headers[0].KeyID, config)
+	key, err := getPublicKey(parsedJWT.Headers[0].KeyID, config)
 	if err != nil {
 		glog.Errorf("Failed to get publickey %v", err)
 		return nil, err
 	}
-	num, _ := base64.RawURLEncoding.DecodeString(n)
 
-	bigN := new(big.Int)
-	bigN.SetBytes(num)
-	num, _ = base64.RawURLEncoding.DecodeString(e)
-	bigE := new(big.Int)
-	bigE.SetBytes(num)
-	key := rsa.PublicKey{bigN, int(bigE.Int64())}
-
-	err = parsedJWT.Claims(&key, &keyCloakToken)
+	err = parsedJWT.Claims(key, &keyCloakToken)
 	if err != nil {
 		glog.Errorf("Failed to get claims JWT:%+v", err)
 		return nil, err
@@ -187,13 +227,13 @@ func authChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunctio
 		go func() {
 			tokenContainer, ok := getTokenContainer(ctx, config)
 			if !ok {
-				ctx.AbortWithError(http.StatusUnauthorized, errors.New("No token in context"))
+				_ = ctx.AbortWithError(http.StatusUnauthorized, errors.New("No token in context"))
 				varianceControl <- false
 				return
 			}
 
 			if !tokenContainer.Valid() {
-				ctx.AbortWithError(http.StatusUnauthorized, errors.New("Invalid Token"))
+				_ = ctx.AbortWithError(http.StatusUnauthorized, errors.New("Invalid Token"))
 				varianceControl <- false
 				return
 			}
@@ -219,7 +259,7 @@ func authChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunctio
 				return
 			}
 		case <-time.After(VarianceTimer):
-			ctx.AbortWithError(http.StatusGatewayTimeout, errors.New("Authorization check overtime"))
+			_ = ctx.AbortWithError(http.StatusGatewayTimeout, errors.New("Authorization check overtime"))
 			glog.V(2).Infof("[Gin-OAuth] %12v %s overtime", time.Since(t), ctx.Request.URL.Path)
 			return
 		}
