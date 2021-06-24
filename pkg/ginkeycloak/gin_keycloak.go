@@ -5,16 +5,19 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"math/big"
+	"net/http"
+	"net/url"
+	"path"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/oauth2"
 	"gopkg.in/square/go-jose.v2/jwt"
-	"io/ioutil"
-	"math/big"
-	"net/http"
-	"strings"
-	"time"
 )
 
 // VarianceTimer controls the max runtime of Auth() and AuthChain() middleware
@@ -60,7 +63,9 @@ func GetTokenContainer(token *oauth2.Token, config KeycloakConfig) (*TokenContai
 func getPublicKey(keyId string, config KeycloakConfig) (string, string, error) {
 	keyEntry, exists := publicKeyCache.Get(keyId)
 	if !exists {
-		url := config.Url + "/auth/realms/" + config.Realm + "/protocol/openid-connect/certs"
+		u, _ := url.Parse(config.Url)
+		u.Path = path.Join(u.Path, "auth/realms", config.Realm, "protocol/openid-connect/certs")
+		url := u.String()
 
 		resp, err := http.Get(url)
 		if err != nil {
@@ -73,6 +78,9 @@ func getPublicKey(keyId string, config KeycloakConfig) (string, string, error) {
 		err = json.Unmarshal(body, &certs)
 		if err != nil {
 			return "", "", err
+		}
+		if len(certs.Keys) == 0 {
+			return "", "", errors.New("No public keys found")
 		}
 
 		keyEntry = certs
