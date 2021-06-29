@@ -39,7 +39,7 @@ dependencies:
 
 Assuming you've installed Go and Gin, run this:
 
-    go get github.com/tbaehler/gin-keycloak
+    go get github.com/Adikteev/gin-keycloak
 
 ## Usage
 

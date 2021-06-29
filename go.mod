@@ -1,4 +1,4 @@
-module github.com/tbaehler/gin-keycloak
+module github.com/Adikteev/gin-keycloak
 
 require (
 	github.com/gin-gonic/gin v1.6.3
