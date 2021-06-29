@@ -227,13 +227,13 @@ func authChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunctio
 		go func() {
 			tokenContainer, ok := getTokenContainer(ctx, config)
 			if !ok {
-				_ = ctx.AbortWithError(http.StatusUnauthorized, errors.New("No token in context"))
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, NewErrorResponse(ctx, errors.New("No token in context")))
 				varianceControl <- false
 				return
 			}
 
 			if !tokenContainer.Valid() {
-				_ = ctx.AbortWithError(http.StatusUnauthorized, errors.New("Invalid Token"))
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, NewErrorResponse(ctx, errors.New("Invalid Token")))
 				varianceControl <- false
 				return
 			}
@@ -245,7 +245,7 @@ func authChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunctio
 				}
 
 				if len(accessCheckFunctions)-1 == i {
-					_ = ctx.AbortWithError(http.StatusForbidden, errors.New("Access to the Resource is forbidden"))
+					ctx.AbortWithStatusJSON(http.StatusForbidden, NewErrorResponse(ctx, errors.New("Access to the Resource is forbidden")))
 					varianceControl <- false
 					return
 				}
@@ -259,7 +259,7 @@ func authChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunctio
 				return
 			}
 		case <-time.After(VarianceTimer):
-			_ = ctx.AbortWithError(http.StatusGatewayTimeout, errors.New("Authorization check overtime"))
+			ctx.AbortWithStatusJSON(http.StatusGatewayTimeout, NewErrorResponse(ctx, errors.New("Authorization check overtime")))
 			glog.V(2).Infof("[Gin-OAuth] %12v %s overtime", time.Since(t), ctx.Request.URL.Path)
 			return
 		}
