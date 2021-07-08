@@ -76,6 +76,7 @@ Once again, you can use curl to test:
         curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/privateGroup/
         {"message":"Hello from private to sszuecs member of teapot"}
 
+
 ### Uid-Based Access
 
 Restrict all access but for a few users
@@ -155,7 +156,17 @@ Realm Based Access is also possible and straightforward:
     	....
     })
 
-	
+## FAQ
+
+#### Which Token Signature Algorithms are currently supported?
+Currently, are only "EC" (which uses keycloak by default) and "RS" supported
+
+#### How to get the keycloak claims e.g. sub, mail, name?
+
+        ginToken,_ := context.Get("token")
+        token := ginToken.(ginkeycloak.KeyCloakToken)
+
+
 ## Contributors
 
 Thanks to:
