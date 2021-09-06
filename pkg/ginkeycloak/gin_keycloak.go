@@ -237,19 +237,16 @@ func authChain(config KeycloakConfig, accessCheckFunctions ...AccessCheckFunctio
 				varianceControl <- false
 				return
 			}
-
-			for i, fn := range accessCheckFunctions {
+			ctx.Set("", tokenContainer.KeyCloakToken)
+			for _, fn := range accessCheckFunctions {
 				if fn(tokenContainer, ctx) {
 					varianceControl <- true
-					break
-				}
-
-				if len(accessCheckFunctions)-1 == i {
-					_ = ctx.AbortWithError(http.StatusForbidden, errors.New("Access to the Resource is forbidden"))
-					varianceControl <- false
 					return
 				}
 			}
+			_ = ctx.AbortWithError(http.StatusForbidden, errors.New("Access to the Resource is forbidden"))
+			varianceControl <- false
+			return
 		}()
 
 		select {
