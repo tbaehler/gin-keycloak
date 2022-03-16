@@ -119,7 +119,12 @@ func getPublicKeyFromCacheOrBackend(keyId string, config KeycloakConfig) (KeyEnt
 	if err != nil {
 		return KeyEntry{}, err
 	}
-	u.Path = path.Join(u.Path, "auth/realms", config.Realm, "protocol/openid-connect/certs")
+
+	if config.FullCertsPath != nil {
+		u.Path = *config.FullCertsPath
+	} else {
+		u.Path = path.Join(u.Path, "auth/realms", config.Realm, "protocol/openid-connect/certs")
+	}
 
 	resp, err := http.Get(u.String())
 	if err != nil {
@@ -210,8 +215,9 @@ func (t *TokenContainer) Valid() bool {
 }
 
 type KeycloakConfig struct {
-	Url   string
-	Realm string
+	Url           string
+	Realm         string
+	FullCertsPath *string
 }
 
 func Auth(accessCheckFunction AccessCheckFunction, endpoints KeycloakConfig) gin.HandlerFunc {

@@ -9,6 +9,7 @@ type BuilderConfig struct {
 	Service              string
 	Url                  string
 	Realm                string
+	FullCertsPath        *string
 	DisableSecurityCheck bool
 }
 
@@ -56,8 +57,9 @@ func (builder restrictedAccessBuilderImpl) Build() gin.HandlerFunc {
 
 func (builder restrictedAccessBuilderImpl) keycloakConfig() KeycloakConfig {
 	return KeycloakConfig{
-		Url:   builder.config.Url,
-		Realm: builder.config.Realm,
+		Url:           builder.config.Url,
+		Realm:         builder.config.Realm,
+		FullCertsPath: builder.config.FullCertsPath,
 	}
 }
 

@@ -54,11 +54,12 @@ Gin middlewares you use:
 	router.Use(ginkeycloak.RequestLogger([]string{"uid"}, "data"))
 	router.Use(gin.Recovery())
 
-A Keycloakconfig
+A Keycloakconfig. You can either use URL and Realm or define a fullpath that point to protocol/openid-connect/certs 
 
     var sbbEndpoint = ginkeycloak.KeycloakConfig{
 	    Url:  "https://keycloack.domain.ch/",
 	    Realm: "Your Realm",
+        FullCertsPath: nil
     }
 
 Lastly, define which type of access you grant to the defined
