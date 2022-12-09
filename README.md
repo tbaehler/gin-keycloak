@@ -2,8 +2,8 @@
 
 
 Gin-Keycloak is specially made for [Gin Framework](https://github.com/gin-gonic/gin)
-users who also want to use Keycoak. 
-This Project was inspired by zalando's gin-oauth 
+users who also want to use Keycoak.
+This Project was inspired by zalando's gin-oauth
 
 ## Project Context and Features
 
@@ -49,16 +49,16 @@ With this function you just check if user is authenticated. Therefore there is n
 
 Gin middlewares you use:
 
-	router := gin.New()
-	router.Use(ginglog.Logger(3 * time.Second))
-	router.Use(ginkeycloak.RequestLogger([]string{"uid"}, "data"))
-	router.Use(gin.Recovery())
+    router := gin.New()
+    router.Use(ginglog.Logger(3 * time.Second))
+    router.Use(ginkeycloak.RequestLogger([]string{"uid"}, "data"))
+    router.Use(gin.Recovery())
 
-A Keycloakconfig. You can either use URL and Realm or define a fullpath that point to protocol/openid-connect/certs 
+A Keycloakconfig. You can either use URL and Realm or define a fullpath that point to protocol/openid-connect/certs
 
     var sbbEndpoint = ginkeycloak.KeycloakConfig{
-	    Url:  "https://keycloack.domain.ch/",
-	    Realm: "Your Realm",
+        Url:  "https://keycloack.domain.ch/",
+        Realm: "Your Realm",
         FullCertsPath: nil
     }
 
@@ -66,11 +66,11 @@ Lastly, define which type of access you grant to the defined
 team. We'll use a router group again:
 
 
-	privateGroup := router.Group("/api/privateGroup")
-	privateGroup.Use(ginkeycloak.Auth(ginkeycloak.AuthCheck(), keycloakconfig))
-	privateGroup.GET("/", func(c *gin.Context) {
-		....
-	})
+    privateGroup := router.Group("/api/privateGroup")
+    privateGroup.Use(ginkeycloak.Auth(ginkeycloak.AuthCheck(), keycloakconfig))
+    privateGroup.GET("/", func(c *gin.Context) {
+    	....
+    })
 
 Once again, you can use curl to test:
 
@@ -87,18 +87,18 @@ Restrict all access but for a few users
               		url:                  "<your token url>",
               		realm:                "<your realm to get the public keys>",
               }
-    
-	router := gin.New()
-	privateUser := router.Group("/api/privateUser")
-	
-	privateUser.Use(ginkeycloak.NewAccessBuilder(config).
+
+    router := gin.New()
+    privateUser := router.Group("/api/privateUser")
+
+    privateUser.Use(ginkeycloak.NewAccessBuilder(config).
         RestrictButForUid("domain\user1").
         RestrictButForUid("domain\user2").
         Build())
-        
-	privateUser.GET("/", func(c *gin.Context) {
-		....
-	})
+
+    privateUser.GET("/", func(c *gin.Context) {
+    	....
+    })
 
 #### Testing
 
@@ -111,21 +111,21 @@ To test, you can use curl:
 
 Restrict all access but for the given roles
 
-        
+
     config := ginkeycloak.BuilderConfig{
                   		service:              <yourServicename>,
                   		url:                  "<your token url>",
                   		realm:                "<your realm to get the public keys>",
                   }
-        
+
     router := gin.New()
     privateUser := router.Group("/api/privateUser")
-    
+
     privateUser.Use(ginkeycloak.NewAccessBuilder(config).
         RestrictButForRole("role1").
         RestrictButForRole("role2").
         Build())
-        
+
     privateUser.GET("/", func(c *gin.Context) {
     	....
     })
@@ -139,23 +139,48 @@ Once again, you can use curl to test:
 
 Realm Based Access is also possible and straightforward:
 
-        
+
     config := ginkeycloak.BuilderConfig{
                       		service:              <yourServicename>,
                       		url:                  "<your token url>",
                       		realm:                "<your realm to get the public keys>",
                       }
-            
+
     router := gin.New()
     privateUser := router.Group("/api/privateUser")
-    
+
     privateUser.Use(ginkeycloak.NewAccessBuilder(config).
         RestrictButForRealm("realmRole").
         Build())
-        
+
     privateUser.GET("/", func(c *gin.Context) {
     	....
     })
+
+
+## Custom Claims Mapper
+
+It is possible to configure a custom claims mapper to add to the `KeyCloakToken` custom claims that are not standard for KeyCloak tokens. The custom claims can be added to the provided field `CustomClaims`.
+
+Here a simple example:
+
+    type MyCustomClaims struct {
+        Tenant string `json:"https://your-realm/tenant,omitempty"`
+    }
+
+    func MyCustomClaimsMapper(jsonWebToken *jwt.JSONWebToken, keyCloakToken *ginkeycloak.KeyCloakToken) error {
+        claims := MyCustomClaims{}
+        jsonWebToken.UnsafeClaimsWithoutVerification(&claims)
+        keyCloakToken.CustomClaims = claims
+        return nil
+    }
+
+    var keycloakconfig = ginkeycloak.KeycloakConfig{
+        Url:                "https://keycloack.domain.ch/"
+        Realm:              "your-realm",
+        FullCertsPath:      nil,
+        CustomClaimsMapper: MyCustomClaimsMapper,
+    }
 
 ## FAQ
 
@@ -172,7 +197,7 @@ Currently, are only "EC" (which uses keycloak by default) and "RS" supported
 
 Thanks to:
 
-- Zalando Team for their initial work 
+- Zalando Team for their initial work
 
 ## License
 

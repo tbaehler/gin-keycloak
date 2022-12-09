@@ -151,6 +151,7 @@ func getPublicKeyFromCacheOrBackend(keyId string, config KeycloakConfig) (KeyEnt
 
 func decodeToken(token *oauth2.Token, config KeycloakConfig) (*KeyCloakToken, error) {
 	keyCloakToken := KeyCloakToken{}
+
 	var err error
 	parsedJWT, err := jwt.ParseSigned(token.AccessToken)
 	if err != nil {
@@ -168,6 +169,15 @@ func decodeToken(token *oauth2.Token, config KeycloakConfig) (*KeyCloakToken, er
 		glog.Errorf("Failed to get claims JWT:%+v", err)
 		return nil, err
 	}
+
+	if config.CustomClaimsMapper != nil {
+		err = config.CustomClaimsMapper(parsedJWT, &keyCloakToken)
+		if err != nil {
+			glog.Errorf("Failed to get custom claims JWT:%+v", err)
+			return nil, err
+		}
+	}
+
 	return &keyCloakToken, nil
 }
 
@@ -215,9 +225,10 @@ func (t *TokenContainer) Valid() bool {
 }
 
 type KeycloakConfig struct {
-	Url           string
-	Realm         string
-	FullCertsPath *string
+	Url                string
+	Realm              string
+	FullCertsPath      *string
+	CustomClaimsMapper func(jsonWebToken *jwt.JSONWebToken, keyCloakToken *KeyCloakToken) error
 }
 
 func Auth(accessCheckFunction AccessCheckFunction, endpoints KeycloakConfig) gin.HandlerFunc {
