@@ -123,7 +123,7 @@ func getPublicKeyFromCacheOrBackend(keyId string, config KeycloakConfig) (KeyEnt
 	if config.FullCertsPath != nil {
 		u.Path = *config.FullCertsPath
 	} else {
-		u.Path = path.Join(u.Path, "auth/realms", config.Realm, "protocol/openid-connect/certs")
+		u.Path = path.Join(u.Path, "realms", config.Realm, "protocol/openid-connect/certs")
 	}
 
 	resp, err := http.Get(u.String())
