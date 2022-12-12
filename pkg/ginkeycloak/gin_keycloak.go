@@ -224,11 +224,13 @@ func (t *TokenContainer) Valid() bool {
 	return t.Token.Valid()
 }
 
+type ClaimMapperFunc func(jsonWebToken *jwt.JSONWebToken, keyCloakToken *KeyCloakToken) error
+
 type KeycloakConfig struct {
 	Url                string
 	Realm              string
 	FullCertsPath      *string
-	CustomClaimsMapper func(jsonWebToken *jwt.JSONWebToken, keyCloakToken *KeyCloakToken) error
+	CustomClaimsMapper ClaimMapperFunc
 }
 
 func Auth(accessCheckFunction AccessCheckFunction, endpoints KeycloakConfig) gin.HandlerFunc {

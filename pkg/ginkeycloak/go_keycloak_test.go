@@ -8,10 +8,8 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
+	"errors"
+	"fmt"
 	"log"
 	"math/big"
 	"net/http"
@@ -19,6 +17,11 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 const dummyPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
@@ -73,6 +76,17 @@ const validRealmRole = "a valid Realm role"
 
 var tokens []string
 
+type TokenWithCustomClaim struct {
+	KeyCloakToken
+	Tenant string `json:"https://domain/tenant,omitempty"`
+}
+
+type TestCustomClaims struct {
+	Tenant string `json:"https://domain/tenant,omitempty"`
+}
+
+const CUSTOM_TENANT = "customTenant"
+
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
 
@@ -90,7 +104,12 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func setupRSA(token KeyCloakToken) {
+func setupRSA(keyCloakToken KeyCloakToken) {
+	customToken := TokenWithCustomClaim{
+		KeyCloakToken: keyCloakToken,
+		Tenant:        CUSTOM_TENANT,
+	}
+
 	pubBlock, _ := pem.Decode([]byte(dummyPublicKey))
 	pubKey, err := x509.ParsePKIXPublicKey(pubBlock.Bytes)
 	if err != nil {
@@ -103,7 +122,7 @@ func setupRSA(token KeyCloakToken) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	signedTokenRsa, err := jwt.Signed(sigRsa).Claims(&token).CompactSerialize()
+	signedTokenRsa, err := jwt.Signed(sigRsa).Claims(&customToken).CompactSerialize()
 	if err != nil {
 		panic(err)
 	}
@@ -134,12 +153,17 @@ func createToken(expiredDate time.Time) KeyCloakToken {
 	return token
 }
 
-func SetupEC(token KeyCloakToken) {
+func SetupEC(keyCloakToken KeyCloakToken) {
+	customToken := TokenWithCustomClaim{
+		KeyCloakToken: keyCloakToken,
+		Tenant:        CUSTOM_TENANT,
+	}
+
 	sigEc, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: dummyECKey}, (&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "2"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	signedTokenEc, err := jwt.Signed(sigEc).Claims(&token).CompactSerialize()
+	signedTokenEc, err := jwt.Signed(sigEc).Claims(&customToken).CompactSerialize()
 	if err != nil {
 		panic(err)
 	}
@@ -332,6 +356,44 @@ func Test_Auth_all_valid(t *testing.T) {
 		RestrictButForRole(validRole).
 		RestrictButForRealm(validRealmRole).
 		Build()
+
+	for _, token := range tokens {
+		ctx := buildContext(token)
+		authFunc(ctx)
+		assert.True(t, len(ctx.Errors) == 0)
+	}
+}
+
+func customCheck() func(tc *TokenContainer, ctx *gin.Context) bool {
+	authCheck := AuthCheck() // default auth check
+	return func(tc *TokenContainer, ctx *gin.Context) bool {
+		if authCheck(tc, ctx) {
+			var tenant string
+			if tc.KeyCloakToken.CustomClaims != nil {
+				customClaims := tc.KeyCloakToken.CustomClaims.(TestCustomClaims)
+				tenant = customClaims.Tenant
+			}
+			if CUSTOM_TENANT != tenant {
+				errorMessage := fmt.Sprintf("Invalid tenant '%s'", tenant)
+				ctx.AbortWithError(http.StatusUnauthorized, errors.New(errorMessage))
+			}
+			return true
+		}
+		return false
+	}
+}
+
+func testCustomClaimsMapper(jsonWebToken *jwt.JSONWebToken, keyCloakToken *KeyCloakToken) error {
+	claims := TestCustomClaims{}
+	jsonWebToken.UnsafeClaimsWithoutVerification(&claims)
+	keyCloakToken.CustomClaims = claims
+	return nil
+}
+
+func Test_Auth_with_custom_claim(t *testing.T) {
+	authFunc := Auth(customCheck(), KeycloakConfig{
+		CustomClaimsMapper: testCustomClaimsMapper,
+	})
 
 	for _, token := range tokens {
 		ctx := buildContext(token)
