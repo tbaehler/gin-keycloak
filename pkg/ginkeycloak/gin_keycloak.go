@@ -19,7 +19,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/oauth2"
-	"gopkg.in/square/go-jose.v2/jwt"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 )
 
 // VarianceTimer controls the max runtime of Auth() and AuthChain() middleware
@@ -75,7 +75,7 @@ func getPublicKey(keyId string, config KeycloakConfig) (interface{}, error) {
 		e, _ := base64.RawURLEncoding.DecodeString(keyEntry.E)
 		bigE := new(big.Int)
 		bigE.SetBytes(e)
-		return &rsa.PublicKey{bigN, int(bigE.Int64())}, nil
+		return &rsa.PublicKey{N: bigN, E: int(bigE.Int64())}, nil
 	} else if strings.ToUpper(keyEntry.Kty) == "EC" {
 		x, _ := base64.RawURLEncoding.DecodeString(keyEntry.X)
 		bigX := new(big.Int)
