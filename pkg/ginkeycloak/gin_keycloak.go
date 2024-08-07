@@ -126,7 +126,11 @@ func getPublicKeyFromCacheOrBackend(keyId string, config KeycloakConfig) (KeyEnt
 		u.Path = path.Join(u.Path, "realms", config.Realm, "protocol/openid-connect/certs")
 	}
 
-	resp, err := http.Get(u.String())
+	httpClient := http.DefaultClient
+	if config.HTTPClient != nil {
+		httpClient = config.HTTPClient
+	}
+	resp, err := httpClient.Get(u.String())
 	if err != nil {
 		return KeyEntry{}, err
 	}
@@ -231,6 +235,7 @@ type KeycloakConfig struct {
 	Realm              string
 	FullCertsPath      *string
 	CustomClaimsMapper ClaimMapperFunc
+	HTTPClient *http.Client
 }
 
 func Auth(accessCheckFunction AccessCheckFunction, endpoints KeycloakConfig) gin.HandlerFunc {
